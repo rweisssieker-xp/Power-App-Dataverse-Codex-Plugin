@@ -8,6 +8,7 @@ The plugin positions Dataverse as an autonomous enterprise intelligence platform
 
 - Dataverse and Power Platform AI action design skills
 - Advanced AI USP coverage from organizational cognitive graph to intent-driven enterprise computing
+- Monetizable enterprise USPs such as trust scoring, compliance evidence, change impact intelligence, autonomous remediation playbooks, tenant-specific skill generation, and operating cadence automation
 - A real stdio MCP server for Microsoft Dataverse Web API access through OAuth2 client credentials
 - Safety-gated write tools for create, update, delete, and Dataverse action execution
 

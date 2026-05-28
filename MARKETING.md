@@ -41,6 +41,9 @@ Dataverse AI Action Platform combines Dataverse semantics, OAuth-backed live met
 | Action Simulation Before Execution | Reduces risk before records, flows, or approvals are changed. |
 | Live Dataverse MCP with OAuth | Connects strategy to real metadata and records. |
 | Advanced Enterprise Intelligence USPs | Extends the roadmap toward digital twins, reasoning, executive intelligence, and autonomous agents. |
+| Trust Score for AI Actions | Makes every proposed action reviewable by risk, evidence, approval, reversibility, and impact. |
+| Enterprise Change Impact AI | Shows business and technical blast radius before Dataverse or Power Platform changes. |
+| Tenant-Specific AI Skill Factory | Turns tenant metadata, language, and governance into reusable local AI skills. |
 
 ## Messaging Pillars
 
@@ -59,6 +62,10 @@ Tables and relationships become a cognitive graph of processes, roles, decisions
 ### 4. AI Moves From Assistant to Runtime
 
 The long-term platform vision is enterprise intelligence as runtime: semantic understanding, autonomous process execution, predictive risk detection, and continuous organizational learning.
+
+### 5. Trust Becomes a Product Feature
+
+Every proposed action can be scored, simulated, explained, approved, and evidenced before it changes enterprise data.
 
 ## Website Hero Copy
 
@@ -97,6 +104,9 @@ Most Power Platform AI tools help users ask questions or draft content. Datavers
 - Simulation preview for a risky bulk update.
 - ALM readiness review for a real solution.
 - Executive intelligence brief generated from sample Dataverse data.
+- Trust score generated for a proposed high-impact action.
+- Change impact brief generated for a Dataverse table, flow, or security-role change.
+- Tenant-specific skill blueprint generated from sample metadata and governance rules.
 
 ## Claims Guardrails
 
@@ -106,6 +116,8 @@ Use:
 - "Connects to Dataverse through OAuth-backed MCP tools."
 - "Supports safety-gated writes."
 - "Provides a roadmap toward autonomous enterprise intelligence."
+- "Scores AI actions for trust, risk, evidence, and impact."
+- "Documents compliance evidence requirements for AI-assisted actions."
 
 Avoid until implemented and validated:
 
@@ -114,6 +126,8 @@ Avoid until implemented and validated:
 - "Learns continuously from all enterprise systems."
 - "Replaces Microsoft Copilot."
 - "Guarantees compliance."
+- "Automatically fixes production issues without approval."
+- "Continuously learns from tenant data without governance controls."
 
 ## Launch Assets
 
@@ -134,7 +148,9 @@ Start read-only. Simulate risk. Explain every action. Scale toward governed auto
 5. Describe a table.
 6. Generate an intent-to-action plan.
 7. Simulate a bulk update.
-8. Review governance and explainability output.
+8. Generate a trust score.
+9. Produce a change impact brief.
+10. Review governance and explainability output.
 
 ## Success Metrics
 
@@ -144,3 +160,6 @@ Start read-only. Simulate risk. Explain every action. Scale toward governed auto
 - number of simulated changes reviewed before execution
 - governance issues found before release
 - adoption by Power Platform architects and Center of Excellence teams
+- high-impact actions reviewed with trust scores
+- exceptions routed to accountable owners
+- reusable tenant-specific skills created

@@ -65,6 +65,7 @@ Additional delivery skills:
 - `alm-solution-readiness` supports Dataverse and Power Platform solution delivery quality.
 - `dataverse-live-mcp-runtime` covers real OAuth MCP usage and live Dataverse safety rules.
 - `advanced-enterprise-intelligence-platform` covers the advanced USP expansion from Organizational Cognitive Graph through Intent-Driven Enterprise Computing.
+- `enterprise-usp-monetization-pack` covers compliance evidence, ROI scoring, remediation playbooks, tenant-specific skill generation, cross-tenant rollout, capability maps, trust scoring, exception management, change impact, and operating cadence.
 
 ## Advanced AI USP Expansion
 
@@ -76,6 +77,19 @@ The advanced USP expansion is documented in `ADVANCED_USPS.md`. It extends the p
 - Dataverse as enterprise memory, semantic graph, runtime layer, decision model, and process network
 - Power Platform as an autonomous execution system
 - AI as the enterprise orchestrator
+
+The monetizable USP pack extends this with:
+
+- Compliance Evidence Automation
+- ROI and Process Value Scoring
+- Autonomous Remediation Playbooks
+- Tenant-Specific AI Skill Factory
+- Governed Cross-Tenant Rollout
+- Business Capability Map
+- Trust Score for AI Actions
+- Autonomous Exception Management
+- Enterprise Change Impact AI
+- AI-Controlled Operating Cadence
 
 ## Live MCP Tools
 
