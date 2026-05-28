@@ -22,7 +22,11 @@ The plugin positions Dataverse as an autonomous enterprise intelligence platform
 ## Repository Layout
 
 ```text
+.codex-plugin/plugin.json
+.mcp.json
 .agents/plugins/marketplace.json
+mcp/dataverse-mcp.mjs
+skills/
 plugins/power-app-dataverse-codex-plugin/
   .codex-plugin/plugin.json
   .mcp.json
@@ -35,6 +39,15 @@ plugins/power-app-dataverse-codex-plugin/
 
 ## Plugin Discovery
 
+GitHub and Codex artifact validation can discover the plugin from the repository root:
+
+```text
+.codex-plugin/plugin.json
+.mcp.json
+skills/
+mcp/
+```
+
 The repo-local marketplace entry points to:
 
 ```text
@@ -44,12 +57,14 @@ The repo-local marketplace entry points to:
 Plugin manifest:
 
 ```text
+.codex-plugin/plugin.json
 plugins/power-app-dataverse-codex-plugin/.codex-plugin/plugin.json
 ```
 
 MCP manifest:
 
 ```text
+.mcp.json
 plugins/power-app-dataverse-codex-plugin/.mcp.json
 ```
 
@@ -80,13 +95,13 @@ Writes are blocked unless `DATAVERSE_ALLOW_WRITES=true` and the tool call includ
 Run plugin validation with:
 
 ```powershell
-python 'C:\Users\reinerw\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py' 'D:\temp\Power-App-Dataverse-Codex-Plugin\plugins\power-app-dataverse-codex-plugin'
+python 'C:\Users\reinerw\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py' 'D:\temp\Power-App-Dataverse-Codex-Plugin'
 ```
 
 Run the MCP syntax check with:
 
 ```powershell
-node --check plugins\power-app-dataverse-codex-plugin\mcp\dataverse-mcp.mjs
+node --check mcp\dataverse-mcp.mjs
 ```
 
 Run the MCP smoke test manually by starting the plugin in Codex after setting the variables in `.env.example`, then call:

@@ -1,0 +1,61 @@
+{
+  "name": "power-app-dataverse-codex-plugin",
+  "version": "0.1.0+codex.20260528125343",
+  "description": "Enterprise guidance skills and OAuth MCP tools for Dataverse and Power Platform AI action workflows.",
+  "author": {
+    "name": "Local developer"
+  },
+  "license": "MIT",
+  "keywords": [
+    "dataverse",
+    "power-platform",
+    "power-apps",
+    "ai-actions",
+    "enterprise-ai",
+    "conversational-erp",
+    "conversational-crm",
+    "alm",
+    "governance",
+    "voice",
+    "multi-agent",
+    "enterprise-intelligence",
+    "cognitive-graph",
+    "digital-twin",
+    "enterprise-memory",
+    "decision-support",
+    "runtime-security",
+    "trust-score",
+    "compliance-evidence",
+    "change-impact",
+    "skill-factory",
+    "exception-management"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Dataverse AI Action Platform",
+    "shortDescription": "Design and run governed Dataverse AI action workflows with OAuth MCP tools.",
+    "longDescription": "A Codex plugin for shaping Dataverse and Power Apps into an autonomous enterprise intelligence platform. It includes Dataverse and Power Platform AI action design skills, advanced enterprise USP strategy, production and marketing documentation, and a real stdio MCP server for Microsoft Dataverse Web API access through OAuth2 client credentials. Write tools are gated by DATAVERSE_ALLOW_WRITES=true and explicit per-call confirmation.",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": [
+      "Dataverse action design",
+      "Power Platform governance review",
+      "Workflow orchestration planning",
+      "ALM readiness guidance",
+      "Advanced enterprise intelligence strategy",
+      "Compliance evidence automation",
+      "AI action trust scoring",
+      "Enterprise change impact analysis",
+      "Tenant-specific AI skill generation",
+      "Autonomous exception management",
+      "Live Dataverse MCP tools with OAuth"
+    ],
+    "defaultPrompt": [
+      "Design a Dataverse AI action workflow.",
+      "Review this Power Apps solution for ALM readiness.",
+      "Assess governance risks for this Dataverse action."
+    ],
+    "brandColor": "#2563EB"
+  }
+}
