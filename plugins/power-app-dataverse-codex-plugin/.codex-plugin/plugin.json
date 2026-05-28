@@ -1,0 +1,37 @@
+{
+  "name": "power-app-dataverse-codex-plugin",
+  "version": "0.1.0",
+  "description": "Enterprise guidance skills for designing conversational Dataverse and Power Apps action workflows.",
+  "author": {
+    "name": "Local developer"
+  },
+  "license": "MIT",
+  "keywords": [
+    "dataverse",
+    "power-platform",
+    "power-apps",
+    "ai-actions",
+    "alm",
+    "governance"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Dataverse AI Action Platform",
+    "shortDescription": "Design governed AI action workflows for Dataverse and Power Apps.",
+    "longDescription": "A Codex plugin for shaping Dataverse and Power Apps into a conversational enterprise execution platform. It helps translate business intent into action designs, workflow orchestration, ALM readiness checks, data operations plans, and safety governance reviews. Version 1 provides planning, review, and implementation guidance only; it does not authenticate to or execute against live Dataverse environments.",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": [
+      "Dataverse action design",
+      "Power Platform governance review",
+      "Workflow orchestration planning",
+      "ALM readiness guidance"
+    ],
+    "defaultPrompt": [
+      "Design a Dataverse AI action workflow.",
+      "Review this Power Apps solution for ALM readiness.",
+      "Assess governance risks for this Dataverse action."
+    ],
+    "brandColor": "#2563EB"
+  }
+}
