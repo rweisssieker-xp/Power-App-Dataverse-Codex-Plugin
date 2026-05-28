@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "dataverse-ai-action-platform": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/mcp/dataverse-mcp.mjs"
+      ],
+      "env": {
+        "DATAVERSE_URL": "${DATAVERSE_URL}",
+        "AZURE_TENANT_ID": "${AZURE_TENANT_ID}",
+        "AZURE_CLIENT_ID": "${AZURE_CLIENT_ID}",
+        "AZURE_CLIENT_SECRET": "${AZURE_CLIENT_SECRET}",
+        "DATAVERSE_ACCESS_TOKEN": "${DATAVERSE_ACCESS_TOKEN}",
+        "DATAVERSE_OAUTH_SCOPE": "${DATAVERSE_OAUTH_SCOPE}",
+        "DATAVERSE_ALLOW_WRITES": "${DATAVERSE_ALLOW_WRITES}",
+        "DATAVERSE_MAX_TOP": "${DATAVERSE_MAX_TOP}"
+      }
+    }
+  }
+}

@@ -1,6 +1,6 @@
 {
   "name": "power-app-dataverse-codex-plugin",
-  "version": "0.1.0",
+  "version": "0.1.0+codex.20260528123713",
   "description": "Enterprise guidance skills for designing conversational Dataverse and Power Apps action workflows.",
   "author": {
     "name": "Local developer"
@@ -11,21 +11,37 @@
     "power-platform",
     "power-apps",
     "ai-actions",
+    "enterprise-ai",
+    "conversational-erp",
+    "conversational-crm",
     "alm",
-    "governance"
+    "governance",
+    "voice",
+    "multi-agent"
   ],
   "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Dataverse AI Action Platform",
     "shortDescription": "Design governed AI action workflows for Dataverse and Power Apps.",
-    "longDescription": "A Codex plugin for shaping Dataverse and Power Apps into a conversational enterprise execution platform. It helps translate business intent into action designs, workflow orchestration, ALM readiness checks, data operations plans, and safety governance reviews. Version 1 provides planning, review, and implementation guidance only; it does not authenticate to or execute against live Dataverse environments.",
+    "longDescription": "A Codex plugin for shaping Dataverse and Power Apps into a conversational enterprise execution platform. It covers the PRD vision: universal natural-language actions, intent-to-action mapping, autonomous workflow orchestration, context-aware Dataverse AI, conversational ERP/CRM, generated task UI, multi-agent operating models, data operations, organizational memory, voice-first operations, action marketplace design, universal command bar patterns, predictive action intelligence, safety governance, explainable actions, end-user-first UX, and strategic differentiation. It also includes a real stdio MCP server for Microsoft Dataverse Web API access through OAuth2 client credentials. Write tools are gated by DATAVERSE_ALLOW_WRITES=true and explicit per-call confirmation.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [
       "Dataverse action design",
       "Power Platform governance review",
       "Workflow orchestration planning",
-      "ALM readiness guidance"
+      "ALM readiness guidance",
+      "Context-aware action modeling",
+      "Universal action engine planning",
+      "Conversational ERP and CRM design",
+      "Generated UI planning",
+      "Multi-agent operating model design",
+      "Voice-first operations guidance",
+      "Predictive action intelligence planning",
+      "Explainable action design",
+      "Enterprise AI product positioning",
+      "Live Dataverse MCP tools with OAuth"
     ],
     "defaultPrompt": [
       "Design a Dataverse AI action workflow.",
