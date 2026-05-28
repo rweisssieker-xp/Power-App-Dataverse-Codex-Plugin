@@ -16,7 +16,7 @@ Configure these environment variables before using the MCP server:
 DATAVERSE_URL=https://your-org.crm4.dynamics.com
 AZURE_TENANT_ID=<tenant-id>
 AZURE_CLIENT_ID=<app-registration-client-id>
-AZURE_CLIENT_SECRET=<client-secret>
+AZURE_CLIENT_SECRET=
 DATAVERSE_ALLOW_WRITES=false
 ```
 

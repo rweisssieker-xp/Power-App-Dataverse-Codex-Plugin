@@ -1,1 +1,6 @@
 dataverseplugin.pdf
+.env
+.env.*
+!.env.example
+*.local
+*.secret

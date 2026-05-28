@@ -11,6 +11,13 @@ The plugin positions Dataverse as an autonomous enterprise intelligence platform
 - A real stdio MCP server for Microsoft Dataverse Web API access through OAuth2 client credentials
 - Safety-gated write tools for create, update, delete, and Dataverse action execution
 
+## Production and Marketing Docs
+
+- [Production Readiness](PRODUCTION.md)
+- [Security Model](SECURITY.md)
+- [Marketing Positioning](MARKETING.md)
+- [Environment Template](.env.example)
+
 ## Repository Layout
 
 ```text
@@ -53,7 +60,7 @@ Set these environment variables before using the live Dataverse MCP tools:
 DATAVERSE_URL=https://your-org.crm4.dynamics.com
 AZURE_TENANT_ID=<tenant-id>
 AZURE_CLIENT_ID=<app-registration-client-id>
-AZURE_CLIENT_SECRET=<client-secret>
+AZURE_CLIENT_SECRET=
 DATAVERSE_ALLOW_WRITES=false
 ```
 
@@ -80,6 +87,12 @@ Run the MCP syntax check with:
 ```powershell
 node --check plugins\power-app-dataverse-codex-plugin\mcp\dataverse-mcp.mjs
 ```
+
+Run the MCP smoke test manually by starting the plugin in Codex after setting the variables in `.env.example`, then call:
+
+1. `dataverse_oauth_status`
+2. `dataverse_whoami`
+3. `dataverse_list_tables`
 
 ## Local PRD PDF
 
