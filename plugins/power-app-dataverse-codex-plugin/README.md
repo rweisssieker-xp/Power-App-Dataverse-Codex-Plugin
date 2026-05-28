@@ -64,6 +64,18 @@ Additional delivery skills:
 
 - `alm-solution-readiness` supports Dataverse and Power Platform solution delivery quality.
 - `dataverse-live-mcp-runtime` covers real OAuth MCP usage and live Dataverse safety rules.
+- `advanced-enterprise-intelligence-platform` covers the advanced USP expansion from Organizational Cognitive Graph through Intent-Driven Enterprise Computing.
+
+## Advanced AI USP Expansion
+
+The advanced USP expansion is documented in `ADVANCED_USPS.md`. It extends the product from a Dataverse AI action plugin into an autonomous enterprise intelligence platform:
+
+- Enterprise Cognitive Execution System
+- Enterprise Intelligence as Runtime
+- AI Operating System for enterprises
+- Dataverse as enterprise memory, semantic graph, runtime layer, decision model, and process network
+- Power Platform as an autonomous execution system
+- AI as the enterprise orchestrator
 
 ## Live MCP Tools
 

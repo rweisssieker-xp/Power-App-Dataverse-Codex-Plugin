@@ -1,6 +1,6 @@
 {
   "name": "power-app-dataverse-codex-plugin",
-  "version": "0.1.0+codex.20260528123713",
+  "version": "0.1.0+codex.20260528124233",
   "description": "Enterprise guidance skills for designing conversational Dataverse and Power Apps action workflows.",
   "author": {
     "name": "Local developer"
@@ -17,14 +17,20 @@
     "alm",
     "governance",
     "voice",
-    "multi-agent"
+    "multi-agent",
+    "enterprise-intelligence",
+    "cognitive-graph",
+    "digital-twin",
+    "enterprise-memory",
+    "decision-support",
+    "runtime-security"
   ],
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Dataverse AI Action Platform",
     "shortDescription": "Design governed AI action workflows for Dataverse and Power Apps.",
-    "longDescription": "A Codex plugin for shaping Dataverse and Power Apps into a conversational enterprise execution platform. It covers the PRD vision: universal natural-language actions, intent-to-action mapping, autonomous workflow orchestration, context-aware Dataverse AI, conversational ERP/CRM, generated task UI, multi-agent operating models, data operations, organizational memory, voice-first operations, action marketplace design, universal command bar patterns, predictive action intelligence, safety governance, explainable actions, end-user-first UX, and strategic differentiation. It also includes a real stdio MCP server for Microsoft Dataverse Web API access through OAuth2 client credentials. Write tools are gated by DATAVERSE_ALLOW_WRITES=true and explicit per-call confirmation.",
+    "longDescription": "A Codex plugin for shaping Dataverse and Power Apps into an autonomous enterprise intelligence platform. It covers the PRD vision: universal natural-language actions, intent-to-action mapping, autonomous workflow orchestration, context-aware Dataverse AI, conversational ERP/CRM, generated task UI, multi-agent operating models, data operations, organizational memory, voice-first operations, action marketplace design, universal command bar patterns, predictive action intelligence, safety governance, explainable actions, end-user-first UX, strategic differentiation, organizational cognitive graphs, autonomous enterprise reasoning, self-optimizing operations, process discovery, semantic enterprise search, decision simulation, enterprise digital twins, generated business processes, autonomous governance, runtime security, continuous organizational learning, executive intelligence, cross-system cognition, autonomous enterprise agents, and intent-driven enterprise computing. It also includes a real stdio MCP server for Microsoft Dataverse Web API access through OAuth2 client credentials. Write tools are gated by DATAVERSE_ALLOW_WRITES=true and explicit per-call confirmation.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [
@@ -41,6 +47,10 @@
       "Predictive action intelligence planning",
       "Explainable action design",
       "Enterprise AI product positioning",
+      "Autonomous enterprise intelligence strategy",
+      "Organizational cognitive graph design",
+      "Enterprise digital twin planning",
+      "AI-native runtime security guidance",
       "Live Dataverse MCP tools with OAuth"
     ],
     "defaultPrompt": [
