@@ -37,6 +37,7 @@ The plugin exposes:
 - Python 3.11 with `PyYAML` available for plugin validation.
 - Microsoft Entra app registration with Dataverse API access.
 - Dataverse application user configured in the target environment when using client credentials.
+- Optional certificate credentials or managed identity for hardened enterprise deployments.
 
 ## Environment Variables
 
@@ -54,6 +55,10 @@ Optional:
 ```text
 DATAVERSE_OAUTH_SCOPE
 DATAVERSE_AUTH_MODE
+AZURE_CLIENT_CERTIFICATE_PEM
+AZURE_CLIENT_CERTIFICATE_PRIVATE_KEY_PEM
+AZURE_CLIENT_CERTIFICATE_THUMBPRINT
+AZURE_MANAGED_IDENTITY_CLIENT_ID
 DATAVERSE_ACCESS_TOKEN
 DATAVERSE_ALLOW_WRITES
 DATAVERSE_MAX_TOP
@@ -61,6 +66,9 @@ DATAVERSE_RETRY_ATTEMPTS
 DATAVERSE_RETRY_BASE_MS
 DATAVERSE_REQUEST_TIMEOUT_MS
 DATAVERSE_AUDIT_LOG
+DATAVERSE_ALLOWED_ENTITY_SETS
+DATAVERSE_BLOCKED_ENTITY_SETS
+DATAVERSE_BLOCKED_COLUMNS
 ```
 
 ## Production Safety Defaults
@@ -74,6 +82,8 @@ DATAVERSE_AUDIT_LOG
 - Transient 429/5xx responses are retried with backoff.
 - Requests are bounded by `DATAVERSE_REQUEST_TIMEOUT_MS`.
 - Optional JSONL audit events can be written to `DATAVERSE_AUDIT_LOG`.
+- Entity sets can be allowlisted or blocked through `DATAVERSE_ALLOWED_ENTITY_SETS` and `DATAVERSE_BLOCKED_ENTITY_SETS`.
+- Sensitive columns can be blocked through `DATAVERSE_BLOCKED_COLUMNS`.
 - Tool output never prints OAuth secrets.
 
 ## Release Checklist
@@ -101,6 +111,9 @@ First live checks:
 4. Call `dataverse_describe_table` for a known table such as `account`.
 5. Call `dataverse_query` with a small `top` value.
 6. Call `dataverse_query_all` with conservative `max_pages` and `max_records` values when pagination is required.
+7. Call `dataverse_calculate_action_trust_score` before high-impact actions.
+8. Call `dataverse_analyze_change_impact` before table, role, flow, solution, or integration changes.
+9. Call `dataverse_environment_variable_report` and `dataverse_list_solutions` during ALM review.
 
 Write enablement:
 
@@ -113,7 +126,7 @@ Write enablement:
 ## Known Limits
 
 - OAuth uses client credentials or a supplied bearer token; interactive delegated OAuth is not implemented.
-- Delegated device-code OAuth is available through `DATAVERSE_AUTH_MODE=device_code`, but production deployments should still prefer tenant-approved service principals or managed identity patterns where supported.
+- Delegated device-code OAuth is available through `DATAVERSE_AUTH_MODE=device_code`, but production deployments should still prefer tenant-approved service principals, certificate authentication, or managed identity patterns where supported.
 - The MCP server does not implement managed bulk execution.
 - Cross-system connectors are strategic roadmap capabilities unless integrated separately.
 - Advanced USP documents describe product direction and must not be represented as fully implemented runtime behavior.

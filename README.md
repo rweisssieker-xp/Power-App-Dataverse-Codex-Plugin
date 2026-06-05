@@ -124,6 +124,9 @@ Run the MCP smoke test manually by starting the plugin in Codex after setting th
 - Paginated reads through `dataverse_query_all`.
 - Optional local JSONL audit log through `DATAVERSE_AUDIT_LOG`.
 - Device-code OAuth for delegated login scenarios.
+- Certificate and managed-identity auth modes for enterprise hardening.
+- Entity-set allow/block lists and blocked-column policy.
+- Trust score, change impact, ALM, security-context, and compliance evidence tools.
 
 ## Local PRD PDF
 

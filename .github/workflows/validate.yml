@@ -33,6 +33,9 @@ jobs:
           node --check mcp/dataverse-mcp.mjs
           node --check plugins/power-app-dataverse-codex-plugin/mcp/dataverse-mcp.mjs
 
+      - name: MCP smoke test
+        run: node .github/scripts/mcp_smoke_test.mjs
+
       - name: Secret placeholder scan
         shell: pwsh
         run: |

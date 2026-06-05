@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { createHash, createSign, randomUUID } from 'node:crypto';
+
 const serverInfo = {
   name: 'dataverse-ai-action-platform',
   version: '0.2.0',
@@ -10,15 +12,22 @@ const config = {
   tenantId: process.env.AZURE_TENANT_ID || '',
   clientId: process.env.AZURE_CLIENT_ID || '',
   clientSecret: process.env.AZURE_CLIENT_SECRET || '',
+  clientCertificatePem: process.env.AZURE_CLIENT_CERTIFICATE_PEM || '',
+  clientCertificatePrivateKeyPem: process.env.AZURE_CLIENT_CERTIFICATE_PRIVATE_KEY_PEM || '',
+  clientCertificateThumbprint: process.env.AZURE_CLIENT_CERTIFICATE_THUMBPRINT || '',
   accessToken: process.env.DATAVERSE_ACCESS_TOKEN || '',
   oauthScope: process.env.DATAVERSE_OAUTH_SCOPE || '',
   authMode: process.env.DATAVERSE_AUTH_MODE || 'auto',
+  managedIdentityClientId: process.env.AZURE_MANAGED_IDENTITY_CLIENT_ID || '',
   allowWrites: String(process.env.DATAVERSE_ALLOW_WRITES || '').toLowerCase() === 'true',
   maxTop: parsePositiveInt(process.env.DATAVERSE_MAX_TOP, 500),
   retryAttempts: parsePositiveInt(process.env.DATAVERSE_RETRY_ATTEMPTS, 3),
   retryBaseMs: parsePositiveInt(process.env.DATAVERSE_RETRY_BASE_MS, 500),
   requestTimeoutMs: parsePositiveInt(process.env.DATAVERSE_REQUEST_TIMEOUT_MS, 30000),
   auditLogPath: process.env.DATAVERSE_AUDIT_LOG || '',
+  allowedEntitySets: parseCsv(process.env.DATAVERSE_ALLOWED_ENTITY_SETS || ''),
+  blockedEntitySets: parseCsv(process.env.DATAVERSE_BLOCKED_ENTITY_SETS || ''),
+  blockedColumns: parseCsv(process.env.DATAVERSE_BLOCKED_COLUMNS || ''),
 };
 
 let tokenCache = null;
@@ -203,6 +212,93 @@ const tools = [
     description: 'Show local MCP audit-log configuration and whether audit logging is enabled.',
     inputSchema: { type: 'object', properties: {} },
   },
+  {
+    name: 'dataverse_compliance_evidence_schema',
+    description: 'Return the standard compliance evidence schema for governed Dataverse AI actions.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'dataverse_calculate_action_trust_score',
+    description: 'Calculate a trust score for a proposed Dataverse AI action without mutating data.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action_type: { type: 'string', description: 'read, create, update, delete, action, bulk_update, deployment, or governance.' },
+        record_count: { type: 'number' },
+        data_quality: { type: 'number', description: '0-100 score.' },
+        permission_fit: { type: 'number', description: '0-100 score.' },
+        policy_fit: { type: 'number', description: '0-100 score.' },
+        reversibility: { type: 'number', description: '0-100 score.' },
+        approval_status: { type: 'string', description: 'approved, pending, not_required, missing, or rejected.' },
+        evidence_complete: { type: 'boolean' },
+        dependency_risk: { type: 'number', description: '0-100 where higher means more risk.' },
+        sensitive_data: { type: 'boolean' },
+      },
+      required: ['action_type'],
+    },
+  },
+  {
+    name: 'dataverse_analyze_change_impact',
+    description: 'Analyze potential Dataverse or Power Platform change impact from metadata and optional solution context.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        component_type: { type: 'string', description: 'table, column, flow, security_role, app, view, dashboard, integration, or solution.' },
+        logical_name: { type: 'string', description: 'Logical name or component identifier.' },
+        include_metadata: { type: 'boolean', description: 'When true, inspect Dataverse table metadata if component_type is table.' },
+      },
+      required: ['component_type', 'logical_name'],
+    },
+  },
+  {
+    name: 'dataverse_list_solutions',
+    description: 'List Dataverse solutions for ALM readiness inspection.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filter: { type: 'string', description: 'Optional OData $filter.' },
+        top: { type: 'number' },
+      },
+    },
+  },
+  {
+    name: 'dataverse_describe_solution',
+    description: 'Describe one Dataverse solution by unique name and list its solution components.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        unique_name: { type: 'string', description: 'Solution uniquename.' },
+        top_components: { type: 'number' },
+      },
+      required: ['unique_name'],
+    },
+  },
+  {
+    name: 'dataverse_environment_variable_report',
+    description: 'Report Dataverse environment variable definitions and values for ALM review.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        top: { type: 'number' },
+      },
+    },
+  },
+  {
+    name: 'dataverse_check_solution_dependencies',
+    description: 'Create an ALM dependency review brief for a solution using available Dataverse solution metadata.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        unique_name: { type: 'string', description: 'Solution uniquename.' },
+      },
+      required: ['unique_name'],
+    },
+  },
+  {
+    name: 'dataverse_get_security_context',
+    description: 'Inspect current Dataverse identity and available role/team context where readable.',
+    inputSchema: { type: 'object', properties: {} },
+  },
 ];
 
 function normalizeDataverseUrl(value) {
@@ -212,6 +308,13 @@ function normalizeDataverseUrl(value) {
 function parsePositiveInt(value, fallback) {
   const parsed = Number.parseInt(value || '', 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parseCsv(value) {
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function jsonText(value) {
@@ -237,10 +340,12 @@ function requireConfig() {
     throw new Error('Missing DATAVERSE_URL, for example https://org.crm4.dynamics.com');
   }
   const canUseClientCredentials = config.tenantId && config.clientId && config.clientSecret;
+  const canUseCertificate = config.tenantId && config.clientId && config.clientCertificatePrivateKeyPem;
+  const canUseManagedIdentity = shouldUseManagedIdentity();
   const canUseDeviceCode = config.tenantId && config.clientId;
-  if (!config.accessToken && !canUseClientCredentials && !canUseDeviceCode) {
+  if (!config.accessToken && !canUseClientCredentials && !canUseCertificate && !canUseManagedIdentity && !canUseDeviceCode) {
     throw new Error(
-      'Missing OAuth configuration. Set DATAVERSE_ACCESS_TOKEN, client credentials, or AZURE_TENANT_ID and AZURE_CLIENT_ID for device-code auth.',
+      'Missing OAuth configuration. Set DATAVERSE_ACCESS_TOKEN, client credentials, certificate auth, managed identity, or AZURE_TENANT_ID and AZURE_CLIENT_ID for device-code auth.',
     );
   }
 }
@@ -257,6 +362,16 @@ function requireWrite(args) {
 function assertIdentifier(value, label) {
   if (typeof value !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) {
     throw new Error(`${label} must be a simple Dataverse identifier.`);
+  }
+}
+
+function assertEntitySetAllowed(entitySet) {
+  assertIdentifier(entitySet, 'entity_set');
+  if (config.allowedEntitySets.length && !config.allowedEntitySets.includes(entitySet)) {
+    throw new Error(`entity_set '${entitySet}' is not in DATAVERSE_ALLOWED_ENTITY_SETS.`);
+  }
+  if (config.blockedEntitySets.includes(entitySet)) {
+    throw new Error(`entity_set '${entitySet}' is blocked by DATAVERSE_BLOCKED_ENTITY_SETS.`);
   }
 }
 
@@ -290,7 +405,12 @@ function appendQuery(path, params) {
 
 function selectValue(select) {
   if (!Array.isArray(select) || select.length === 0) return undefined;
-  for (const item of select) assertIdentifier(item, 'select column');
+  for (const item of select) {
+    assertIdentifier(item, 'select column');
+    if (config.blockedColumns.includes(item)) {
+      throw new Error(`Column '${item}' is blocked by DATAVERSE_BLOCKED_COLUMNS.`);
+    }
+  }
   return select.join(',');
 }
 
@@ -302,6 +422,14 @@ function shouldUseDeviceCode() {
   return config.authMode === 'device_code' || (!config.clientSecret && !config.accessToken);
 }
 
+function shouldUseManagedIdentity() {
+  return config.authMode === 'managed_identity';
+}
+
+function shouldUseCertificate() {
+  return config.authMode === 'certificate' || (!config.clientSecret && config.clientCertificatePrivateKeyPem);
+}
+
 async function getAccessToken() {
   requireConfig();
   if (config.accessToken) return config.accessToken;
@@ -311,8 +439,16 @@ async function getAccessToken() {
     return tokenCache.accessToken;
   }
 
+  if (shouldUseManagedIdentity()) {
+    return getManagedIdentityToken(now);
+  }
+
   if (shouldUseDeviceCode()) {
     return getDeviceCodeToken(now);
+  }
+
+  if (shouldUseCertificate()) {
+    return getCertificateToken(now);
   }
 
   const scope = config.oauthScope || `${config.dataverseUrl}/.default`;
@@ -339,6 +475,92 @@ async function getAccessToken() {
     expiresAt: now + Number(payload.expires_in || 3600),
   };
   return tokenCache.accessToken;
+}
+
+async function getManagedIdentityToken(now) {
+  const resource = config.dataverseUrl;
+  const endpoint = process.env.IDENTITY_ENDPOINT || process.env.MSI_ENDPOINT || 'http://169.254.169.254/metadata/identity/oauth2/token';
+  const url = new URL(endpoint);
+  url.searchParams.set('api-version', '2018-02-01');
+  url.searchParams.set('resource', resource);
+  if (config.managedIdentityClientId) {
+    url.searchParams.set('client_id', config.managedIdentityClientId);
+  }
+  const headers = endpoint.includes('169.254.169.254')
+    ? { Metadata: 'true' }
+    : { 'X-IDENTITY-HEADER': process.env.IDENTITY_HEADER || '' };
+  const response = await fetch(url, { headers });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload.access_token) {
+    throw new Error(`Managed identity token request failed (${response.status}): ${JSON.stringify(payload)}`);
+  }
+  tokenCache = {
+    accessToken: payload.access_token,
+    expiresAt: now + Number(payload.expires_in || 3600),
+  };
+  return tokenCache.accessToken;
+}
+
+async function getCertificateToken(now) {
+  const tokenUrl = `https://login.microsoftonline.com/${encodeURIComponent(config.tenantId)}/oauth2/v2.0/token`;
+  const scope = config.oauthScope || `${config.dataverseUrl}/.default`;
+  const clientAssertion = createClientAssertion(tokenUrl);
+  const body = new URLSearchParams({
+    client_id: config.clientId,
+    client_assertion: clientAssertion,
+    client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+    grant_type: 'client_credentials',
+    scope,
+  });
+  const response = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body,
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload.access_token) {
+    throw new Error(`Certificate token request failed (${response.status}): ${JSON.stringify(payload)}`);
+  }
+  tokenCache = {
+    accessToken: payload.access_token,
+    expiresAt: now + Number(payload.expires_in || 3600),
+  };
+  return tokenCache.accessToken;
+}
+
+function createClientAssertion(audience) {
+  const now = Math.floor(Date.now() / 1000);
+  const thumbprint = config.clientCertificateThumbprint || certificateThumbprint(config.clientCertificatePem);
+  const header = { alg: 'RS256', typ: 'JWT', x5t: base64Url(Buffer.from(thumbprint.replace(/:/g, ''), 'hex')) };
+  const payload = {
+    aud: audience,
+    exp: now + 600,
+    iss: config.clientId,
+    jti: randomUUID(),
+    nbf: now,
+    sub: config.clientId,
+  };
+  const signingInput = `${base64UrlJson(header)}.${base64UrlJson(payload)}`;
+  const signer = createSign('RSA-SHA256');
+  signer.update(signingInput);
+  signer.end();
+  return `${signingInput}.${base64Url(signer.sign(config.clientCertificatePrivateKeyPem))}`;
+}
+
+function certificateThumbprint(certificatePem) {
+  if (!certificatePem) {
+    throw new Error('Certificate auth requires AZURE_CLIENT_CERTIFICATE_THUMBPRINT or AZURE_CLIENT_CERTIFICATE_PEM.');
+  }
+  const body = certificatePem.replace(/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\s/g, '');
+  return createHash('sha1').update(Buffer.from(body, 'base64')).digest('hex');
+}
+
+function base64UrlJson(value) {
+  return base64Url(Buffer.from(JSON.stringify(value), 'utf8'));
+}
+
+function base64Url(buffer) {
+  return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
 async function getDeviceCodeToken(now) {
@@ -504,6 +726,122 @@ function tryParseJson(text) {
   }
 }
 
+function complianceEvidenceSchema() {
+  return {
+    schemaVersion: '1.0.0',
+    actionId: 'uuid',
+    requestedAt: 'ISO-8601 timestamp',
+    requestedBy: 'Dataverse user or application identity',
+    environmentUrl: 'Dataverse organization URL',
+    actionType: 'read | create | update | delete | action | deployment | governance',
+    businessReason: 'Plain-language rationale',
+    dataUsed: ['tables, records, columns, filters, documents, or signals used'],
+    rulesApplied: ['security, policy, DLP, approval, business, or data-quality rules'],
+    affectedRecords: [{ entitySet: 'accounts', id: 'guid', operation: 'update' }],
+    risk: { trustScore: 0, rating: 'low | medium | high | blocked', reasons: [] },
+    approval: { required: false, status: 'not_required | pending | approved | rejected', reference: '' },
+    simulation: { performed: false, summary: '', recordCount: 0 },
+    result: { status: 'planned | executed | blocked | failed', summary: '' },
+    audit: { logReference: '', retentionClass: '', evidenceOwner: '' },
+  };
+}
+
+function calculateTrustScore(args) {
+  const actionType = String(args.action_type || 'read').toLowerCase();
+  const recordCount = Math.max(0, Number(args.record_count || 0));
+  const metrics = {
+    dataQuality: boundedScore(args.data_quality, 75),
+    permissionFit: boundedScore(args.permission_fit, 70),
+    policyFit: boundedScore(args.policy_fit, 70),
+    reversibility: boundedScore(args.reversibility, actionType === 'delete' ? 20 : 70),
+    dependencySafety: 100 - boundedScore(args.dependency_risk, 25),
+    evidence: args.evidence_complete === true ? 100 : 45,
+  };
+  const weights = {
+    dataQuality: 0.15,
+    permissionFit: 0.2,
+    policyFit: 0.2,
+    reversibility: 0.15,
+    dependencySafety: 0.15,
+    evidence: 0.15,
+  };
+  let score = Object.entries(weights).reduce((sum, [key, weight]) => sum + metrics[key] * weight, 0);
+  const blockingReasons = [];
+  const warnings = [];
+
+  if (['delete', 'bulk_update', 'deployment'].includes(actionType)) score -= 10;
+  if (recordCount > 100) score -= 10;
+  if (recordCount > 1000) score -= 15;
+  if (args.sensitive_data === true) score -= 10;
+  if (args.approval_status === 'missing') score -= 20;
+  if (args.approval_status === 'rejected') blockingReasons.push('Approval was rejected.');
+  if (metrics.permissionFit < 50) blockingReasons.push('Permission fit is below threshold.');
+  if (metrics.policyFit < 50) blockingReasons.push('Policy fit is below threshold.');
+  if (metrics.evidence < 50) warnings.push('Evidence package is incomplete.');
+  if (metrics.reversibility < 40) warnings.push('Action has limited reversibility.');
+
+  score = Math.round(Math.max(0, Math.min(100, score)));
+  const rating = blockingReasons.length ? 'blocked' : score >= 80 ? 'low' : score >= 60 ? 'medium' : 'high';
+  return {
+    score,
+    rating,
+    actionType,
+    metrics,
+    blockingReasons,
+    warnings,
+    recommendation: blockingReasons.length
+      ? 'Do not execute until blocking reasons are resolved.'
+      : rating === 'low'
+        ? 'Safe to proceed under normal approval policy.'
+        : 'Require preview, approval, and audit evidence before execution.',
+  };
+}
+
+function boundedScore(value, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(0, Math.min(100, parsed));
+}
+
+async function changeImpact(args) {
+  const componentType = String(args.component_type || '').toLowerCase();
+  const logicalName = String(args.logical_name || '');
+  const impact = {
+    componentType,
+    logicalName,
+    impactAreas: ['security', 'data quality', 'automation', 'reporting', 'user experience', 'ALM'],
+    reviewChecklist: [
+      'Identify owning business capability and process owner.',
+      'Review dependent apps, flows, views, dashboards, reports, integrations, and security roles.',
+      'Check environment variables, connection references, and solution dependencies.',
+      'Run sandbox validation before production change.',
+      'Prepare rollback and communication plan.',
+    ],
+    metadata: null,
+  };
+  if (componentType === 'table' && args.include_metadata !== false) {
+    assertIdentifier(logicalName, 'logical_name');
+    impact.metadata = await dataverseRequest(
+      appendQuery(`EntityDefinitions(LogicalName='${logicalName}')`, {
+        '$select': 'LogicalName,SchemaName,EntitySetName,PrimaryIdAttribute,PrimaryNameAttribute,OwnershipType,IsCustomEntity,IsActivity',
+        '$expand': 'Attributes($select=LogicalName,SchemaName,AttributeType,RequiredLevel)',
+      }),
+    );
+  }
+  return impact;
+}
+
+async function findSolution(uniqueName) {
+  const result = await dataverseRequest(
+    appendQuery('solutions', {
+      '$select': 'solutionid,uniquename,friendlyname,version,ismanaged,installedon,publisherid',
+      '$filter': `uniquename eq '${String(uniqueName).replace(/'/g, "''")}'`,
+      '$top': '1',
+    }),
+  );
+  return Array.isArray(result.value) ? result.value[0] : null;
+}
+
 async function callTool(name, args = {}) {
   switch (name) {
     case 'dataverse_oauth_status': {
@@ -554,7 +892,7 @@ async function callTool(name, args = {}) {
     }
 
     case 'dataverse_query': {
-      assertIdentifier(args.entity_set, 'entity_set');
+      assertEntitySetAllowed(args.entity_set);
       const params = {
         '$select': selectValue(args.select),
         '$filter': args.filter,
@@ -566,7 +904,7 @@ async function callTool(name, args = {}) {
     }
 
     case 'dataverse_query_all': {
-      assertIdentifier(args.entity_set, 'entity_set');
+      assertEntitySetAllowed(args.entity_set);
       const params = {
         '$select': selectValue(args.select),
         '$filter': args.filter,
@@ -599,7 +937,7 @@ async function callTool(name, args = {}) {
     }
 
     case 'dataverse_retrieve_record': {
-      assertIdentifier(args.entity_set, 'entity_set');
+      assertEntitySetAllowed(args.entity_set);
       const id = cleanGuid(args.id);
       const params = {
         '$select': selectValue(args.select),
@@ -610,20 +948,20 @@ async function callTool(name, args = {}) {
 
     case 'dataverse_create_record': {
       requireWrite(args);
-      assertIdentifier(args.entity_set, 'entity_set');
+      assertEntitySetAllowed(args.entity_set);
       return jsonText(await dataverseRequest(args.entity_set, { method: 'POST', body: args.payload || {} }));
     }
 
     case 'dataverse_update_record': {
       requireWrite(args);
-      assertIdentifier(args.entity_set, 'entity_set');
+      assertEntitySetAllowed(args.entity_set);
       const id = cleanGuid(args.id);
       return jsonText(await dataverseRequest(`${args.entity_set}(${id})`, { method: 'PATCH', body: args.payload || {} }));
     }
 
     case 'dataverse_delete_record': {
       requireWrite(args);
-      assertIdentifier(args.entity_set, 'entity_set');
+      assertEntitySetAllowed(args.entity_set);
       const id = cleanGuid(args.id);
       return jsonText(await dataverseRequest(`${args.entity_set}(${id})`, { method: 'DELETE' }));
     }
@@ -639,7 +977,7 @@ async function callTool(name, args = {}) {
 
     case 'dataverse_execute_bound_action': {
       requireWrite(args);
-      assertIdentifier(args.entity_set, 'entity_set');
+      assertEntitySetAllowed(args.entity_set);
       const id = cleanGuid(args.id);
       const actionName = String(args.action_name || '');
       if (!/^[A-Za-z_][A-Za-z0-9_.]*$/.test(actionName)) {
@@ -654,7 +992,7 @@ async function callTool(name, args = {}) {
     }
 
     case 'dataverse_simulate_bulk_update': {
-      assertIdentifier(args.entity_set, 'entity_set');
+      assertEntitySetAllowed(args.entity_set);
       const preview = await dataverseRequest(
         appendQuery(args.entity_set, {
           '$select': selectValue(args.select),
@@ -676,6 +1014,122 @@ async function callTool(name, args = {}) {
         auditLogPathConfigured: Boolean(config.auditLogPath),
         auditLogPath: config.auditLogPath ? '[configured]' : '',
       });
+
+    case 'dataverse_compliance_evidence_schema':
+      return jsonText(complianceEvidenceSchema());
+
+    case 'dataverse_calculate_action_trust_score':
+      return jsonText(calculateTrustScore(args));
+
+    case 'dataverse_analyze_change_impact':
+      return jsonText(await changeImpact(args));
+
+    case 'dataverse_list_solutions': {
+      const params = {
+        '$select': 'solutionid,uniquename,friendlyname,version,ismanaged,installedon',
+        '$filter': args.filter,
+        '$orderby': 'friendlyname asc',
+        '$top': String(topValue(args.top)),
+      };
+      return jsonText(await dataverseRequest(appendQuery('solutions', params)));
+    }
+
+    case 'dataverse_describe_solution': {
+      const solution = await findSolution(args.unique_name);
+      if (!solution) {
+        throw new Error(`Solution '${args.unique_name}' was not found.`);
+      }
+      const components = await dataverseRequest(
+        appendQuery('solutioncomponents', {
+          '$select': 'solutioncomponentid,componenttype,objectid,rootsolutioncomponentid',
+          '$filter': `_solutionid_value eq ${solution.solutionid}`,
+          '$top': String(topValue(args.top_components || 100)),
+        }),
+      );
+      return jsonText({ solution, components });
+    }
+
+    case 'dataverse_environment_variable_report': {
+      const definitions = await dataverseRequest(
+        appendQuery('environmentvariabledefinitions', {
+          '$select': 'environmentvariabledefinitionid,schemaname,displayname,defaultvalue,type,valueschema',
+          '$top': String(topValue(args.top || 100)),
+        }),
+      );
+      const values = await dataverseRequest(
+        appendQuery('environmentvariablevalues', {
+          '$select': 'environmentvariablevalueid,value,_environmentvariabledefinitionid_value',
+          '$top': String(topValue(args.top || 100)),
+        }),
+      );
+      return jsonText({ definitions, values });
+    }
+
+    case 'dataverse_check_solution_dependencies': {
+      const solution = await findSolution(args.unique_name);
+      if (!solution) {
+        throw new Error(`Solution '${args.unique_name}' was not found.`);
+      }
+      const components = await dataverseRequest(
+        appendQuery('solutioncomponents', {
+          '$select': 'solutioncomponentid,componenttype,objectid,rootsolutioncomponentid',
+          '$filter': `_solutionid_value eq ${solution.solutionid}`,
+          '$top': String(topValue(250)),
+        }),
+      );
+      const count = Array.isArray(components.value) ? components.value.length : 0;
+      return jsonText({
+        solution,
+        componentCount: count,
+        readiness: count > 0 ? 'review_required' : 'at_risk',
+        reviewChecks: [
+          'Confirm all required components are included in the managed solution.',
+          'Review connection references and environment variables.',
+          'Check cloud flows are active and owned by service principals where appropriate.',
+          'Validate security roles and sharing assumptions.',
+          'Run import in a sandbox before production.',
+        ],
+        components,
+      });
+    }
+
+    case 'dataverse_get_security_context': {
+      const whoami = await dataverseRequest('WhoAmI()');
+      const context = { whoami, user: null, roles: null, teams: null, warnings: [] };
+      if (whoami.UserId) {
+        const userId = cleanGuid(whoami.UserId);
+        try {
+          context.user = await dataverseRequest(
+            appendQuery(`systemusers(${userId})`, {
+              '$select': 'systemuserid,fullname,domainname,internalemailaddress,_businessunitid_value,isdisabled',
+            }),
+          );
+        } catch (error) {
+          context.warnings.push(`Could not read system user details: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        try {
+          context.roles = await dataverseRequest(
+            appendQuery(`systemusers(${userId})/systemuserroles_association`, {
+              '$select': 'roleid,name,businessunitid',
+              '$top': '100',
+            }),
+          );
+        } catch (error) {
+          context.warnings.push(`Could not read role associations: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        try {
+          context.teams = await dataverseRequest(
+            appendQuery(`systemusers(${userId})/teammembership_association`, {
+              '$select': 'teamid,name,_businessunitid_value',
+              '$top': '100',
+            }),
+          );
+        } catch (error) {
+          context.warnings.push(`Could not read team associations: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+      return jsonText(context);
+    }
 
     default:
       return errorText(`Unknown tool: ${name}`);

@@ -24,12 +24,15 @@ The MCP server reads these environment variables:
 - `AZURE_CLIENT_SECRET`: client secret
 - `DATAVERSE_OAUTH_SCOPE`: optional override; defaults to `<DATAVERSE_URL>/.default`
 - `DATAVERSE_AUTH_MODE`: `auto`, `client_credentials`, or `device_code`
+- `AZURE_CLIENT_CERTIFICATE_PRIVATE_KEY_PEM`, `AZURE_CLIENT_CERTIFICATE_THUMBPRINT`: optional certificate authentication
+- `AZURE_MANAGED_IDENTITY_CLIENT_ID`: optional managed identity client ID
 - `DATAVERSE_ACCESS_TOKEN`: optional direct bearer token alternative
 - `DATAVERSE_ALLOW_WRITES`: must be `true` before create, update, delete, or POST action tools can mutate data
 - `DATAVERSE_MAX_TOP`: optional maximum OData page size cap; defaults to `500`
 - `DATAVERSE_RETRY_ATTEMPTS`: retry attempts for throttling and transient failures
 - `DATAVERSE_REQUEST_TIMEOUT_MS`: request timeout in milliseconds
 - `DATAVERSE_AUDIT_LOG`: optional local JSONL audit-log path
+- `DATAVERSE_ALLOWED_ENTITY_SETS`, `DATAVERSE_BLOCKED_ENTITY_SETS`, `DATAVERSE_BLOCKED_COLUMNS`: optional OData safety policy
 
 ## Safety Rules
 1. Prefer read-only tools first: `dataverse_oauth_status`, `dataverse_whoami`, `dataverse_list_tables`, `dataverse_describe_table`, `dataverse_query`, and `dataverse_retrieve_record`.
@@ -48,6 +51,10 @@ The MCP server reads these environment variables:
 - Execute actions: `dataverse_execute_unbound_action`, `dataverse_execute_bound_action`
 - Safety preview: `dataverse_simulate_bulk_update`
 - Audit status: `dataverse_audit_status`
+- Trust and evidence: `dataverse_compliance_evidence_schema`, `dataverse_calculate_action_trust_score`
+- Change impact: `dataverse_analyze_change_impact`
+- ALM and solution review: `dataverse_list_solutions`, `dataverse_describe_solution`, `dataverse_environment_variable_report`, `dataverse_check_solution_dependencies`
+- Security context: `dataverse_get_security_context`
 
 ## Output Expectations
 When using live tools, report:

@@ -5,6 +5,8 @@
 The MCP server authenticates to Microsoft Dataverse through either:
 
 - OAuth2 client credentials using `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, and `AZURE_CLIENT_SECRET`
+- certificate-based client credentials using `AZURE_CLIENT_CERTIFICATE_PRIVATE_KEY_PEM` and `AZURE_CLIENT_CERTIFICATE_THUMBPRINT`
+- managed identity using `DATAVERSE_AUTH_MODE=managed_identity`
 - a supplied `DATAVERSE_ACCESS_TOKEN` for local troubleshooting
 - delegated device-code OAuth using `DATAVERSE_AUTH_MODE=device_code`, `AZURE_TENANT_ID`, and `AZURE_CLIENT_ID`
 
@@ -48,6 +50,7 @@ The MCP server:
 - does not log secrets
 - returns Dataverse responses to the MCP client as tool output
 - can write optional local JSONL audit events when `DATAVERSE_AUDIT_LOG` is configured
+- can enforce simple entity-set and column safety policies through environment allowlists and blocklists
 
 Users must treat tool output as tenant data and handle it according to internal policy.
 
@@ -59,6 +62,7 @@ Users must treat tool output as tenant data and handle it according to internal 
 - Use `dataverse_simulate_bulk_update` before any high-impact change.
 - Limit `DATAVERSE_MAX_TOP` to a conservative value.
 - Keep `DATAVERSE_AUDIT_LOG` outside source control and protect it as tenant metadata.
+- Configure `DATAVERSE_ALLOWED_ENTITY_SETS`, `DATAVERSE_BLOCKED_ENTITY_SETS`, and `DATAVERSE_BLOCKED_COLUMNS` for sensitive tenants.
 - Rotate client secrets according to tenant policy.
 - Prefer managed identities or certificate-based auth in future production hardening if the host supports it.
 

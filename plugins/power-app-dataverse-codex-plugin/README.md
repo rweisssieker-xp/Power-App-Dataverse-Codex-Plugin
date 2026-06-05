@@ -110,6 +110,14 @@ The monetizable USP pack extends this with:
 | `dataverse_query_all` | Run bounded paginated OData reads |
 | `dataverse_retrieve_record` | Retrieve one record by GUID |
 | `dataverse_simulate_bulk_update` | Preview bulk-update scope without mutating records |
+| `dataverse_compliance_evidence_schema` | Return the standard compliance evidence schema |
+| `dataverse_calculate_action_trust_score` | Calculate a trust score for a proposed action |
+| `dataverse_analyze_change_impact` | Analyze business and technical change impact |
+| `dataverse_list_solutions` | List Dataverse solutions |
+| `dataverse_describe_solution` | Describe a solution and components |
+| `dataverse_environment_variable_report` | Report environment variable definitions and values |
+| `dataverse_check_solution_dependencies` | Produce a solution dependency review brief |
+| `dataverse_get_security_context` | Inspect current identity, roles, and teams where readable |
 | `dataverse_create_record` | Create a record, gated by write enablement and confirmation |
 | `dataverse_update_record` | Update a record, gated by write enablement and confirmation |
 | `dataverse_delete_record` | Delete a record, gated by write enablement and confirmation |
