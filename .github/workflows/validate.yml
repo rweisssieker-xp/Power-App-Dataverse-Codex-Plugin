@@ -36,6 +36,9 @@ jobs:
       - name: MCP smoke test
         run: node .github/scripts/mcp_smoke_test.mjs
 
+      - name: MCP tool tests
+        run: node .github/scripts/mcp_tool_tests.mjs
+
       - name: Secret placeholder scan
         shell: pwsh
         run: |

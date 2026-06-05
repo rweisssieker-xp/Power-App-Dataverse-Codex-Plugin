@@ -52,6 +52,9 @@ child.on('close', () => {
     'dataverse_analyze_change_impact',
     'dataverse_list_solutions',
     'dataverse_get_security_context',
+    'dataverse_evaluate_action_permission',
+    'dataverse_plan_bulk_operation',
+    'dataverse_result_schemas',
   ];
   const missing = required.filter((tool) => !tools.includes(tool));
   if (missing.length) {

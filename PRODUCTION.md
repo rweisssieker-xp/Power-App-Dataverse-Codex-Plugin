@@ -38,6 +38,7 @@ The plugin exposes:
 - Microsoft Entra app registration with Dataverse API access.
 - Dataverse application user configured in the target environment when using client credentials.
 - Optional certificate credentials or managed identity for hardened enterprise deployments.
+- Tenant setup completed using `TENANT_SETUP.md`.
 
 ## Environment Variables
 

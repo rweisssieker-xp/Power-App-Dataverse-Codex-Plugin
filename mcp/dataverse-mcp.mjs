@@ -299,6 +299,45 @@ const tools = [
     description: 'Inspect current Dataverse identity and available role/team context where readable.',
     inputSchema: { type: 'object', properties: {} },
   },
+  {
+    name: 'dataverse_evaluate_action_permission',
+    description: 'Evaluate a planned Dataverse action against supplied or live security context and return a governance decision.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action_type: { type: 'string', description: 'read, create, update, delete, action, bulk_update, deployment, or governance.' },
+        entity_set: { type: 'string' },
+        record_count: { type: 'number' },
+        required_roles: { type: 'array', items: { type: 'string' } },
+        user_roles: { type: 'array', items: { type: 'string' }, description: 'Optional supplied role names. If omitted, the tool tries live role context.' },
+        approval_status: { type: 'string', description: 'approved, pending, not_required, missing, or rejected.' },
+        sensitive_data: { type: 'boolean' },
+      },
+      required: ['action_type', 'entity_set'],
+    },
+  },
+  {
+    name: 'dataverse_plan_bulk_operation',
+    description: 'Create a governed bulk-operation plan with batching, approval, rollback, and audit steps. Does not mutate Dataverse.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        entity_set: { type: 'string' },
+        filter: { type: 'string' },
+        operation: { type: 'string', description: 'update, delete, assign, merge, classify, or custom_action.' },
+        proposed_changes: { type: 'object' },
+        estimated_records: { type: 'number' },
+        batch_size: { type: 'number' },
+        approval_required: { type: 'boolean' },
+      },
+      required: ['entity_set', 'operation'],
+    },
+  },
+  {
+    name: 'dataverse_result_schemas',
+    description: 'Return stable result schemas for trust score, evidence, change impact, ALM report, and bulk plan outputs.',
+    inputSchema: { type: 'object', properties: {} },
+  },
 ];
 
 function normalizeDataverseUrl(value) {
@@ -746,6 +785,53 @@ function complianceEvidenceSchema() {
   };
 }
 
+function resultSchemas() {
+  return {
+    trustScore: {
+      score: 'number 0-100',
+      rating: 'low | medium | high | blocked',
+      actionType: 'string',
+      metrics: {
+        dataQuality: 'number 0-100',
+        permissionFit: 'number 0-100',
+        policyFit: 'number 0-100',
+        reversibility: 'number 0-100',
+        dependencySafety: 'number 0-100',
+        evidence: 'number 0-100',
+      },
+      blockingReasons: ['string'],
+      warnings: ['string'],
+      recommendation: 'string',
+    },
+    evidence: complianceEvidenceSchema(),
+    changeImpact: {
+      componentType: 'string',
+      logicalName: 'string',
+      impactAreas: ['security', 'data quality', 'automation', 'reporting', 'user experience', 'ALM'],
+      reviewChecklist: ['string'],
+      metadata: 'Dataverse metadata or null',
+    },
+    almReport: {
+      solution: 'solution metadata',
+      componentCount: 'number',
+      readiness: 'ready | review_required | at_risk | blocked',
+      reviewChecks: ['string'],
+      components: 'solution component list',
+    },
+    bulkPlan: {
+      operationId: 'uuid',
+      operation: 'string',
+      entitySet: 'string',
+      estimatedRecords: 'number',
+      batchSize: 'number',
+      approvalRequired: 'boolean',
+      phases: ['preview', 'approve', 'execute', 'verify', 'rollback'],
+      safeguards: ['string'],
+      auditEvidence: 'evidence schema reference',
+    },
+  };
+}
+
 function calculateTrustScore(args) {
   const actionType = String(args.action_type || 'read').toLowerCase();
   const recordCount = Math.max(0, Number(args.record_count || 0));
@@ -840,6 +926,126 @@ async function findSolution(uniqueName) {
     }),
   );
   return Array.isArray(result.value) ? result.value[0] : null;
+}
+
+async function evaluateActionPermission(args) {
+  assertEntitySetAllowed(args.entity_set);
+  const actionType = String(args.action_type || '').toLowerCase();
+  const requiredRoles = Array.isArray(args.required_roles) ? args.required_roles.map(String) : [];
+  let userRoles = Array.isArray(args.user_roles) ? args.user_roles.map(String) : [];
+  const warnings = [];
+
+  if (!userRoles.length) {
+    try {
+      const context = await getSecurityContextPayload();
+      userRoles = Array.isArray(context.roles?.value) ? context.roles.value.map((role) => role.name).filter(Boolean) : [];
+      warnings.push('Live role context was used where readable.');
+    } catch (error) {
+      warnings.push(`Could not read live role context: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  const missingRoles = requiredRoles.filter((role) => !userRoles.includes(role));
+  const mutating = ['create', 'update', 'delete', 'action', 'bulk_update', 'deployment'].includes(actionType);
+  const recordCount = Number(args.record_count || 0);
+  const blockingReasons = [];
+  if (missingRoles.length) blockingReasons.push(`Missing required roles: ${missingRoles.join(', ')}`);
+  if (mutating && args.approval_status === 'rejected') blockingReasons.push('Approval is rejected.');
+  if (mutating && args.approval_status === 'missing') blockingReasons.push('Approval is missing.');
+  if (args.sensitive_data === true && mutating && args.approval_status !== 'approved') {
+    blockingReasons.push('Sensitive data mutation requires approval.');
+  }
+  if (recordCount > 1000 && args.approval_status !== 'approved') {
+    blockingReasons.push('High-volume action requires approval.');
+  }
+
+  return {
+    decision: blockingReasons.length ? 'blocked' : mutating ? 'approval_or_confirm_required' : 'allowed',
+    actionType,
+    entitySet: args.entity_set,
+    requiredRoles,
+    userRoles,
+    missingRoles,
+    warnings,
+    blockingReasons,
+    nextStep: blockingReasons.length
+      ? 'Resolve blocking reasons before execution.'
+      : mutating
+        ? 'Preview target records, collect approval, then use write tools with confirm=true if DATAVERSE_ALLOW_WRITES=true.'
+        : 'Proceed with read-only operation under normal policy.',
+  };
+}
+
+function planBulkOperation(args) {
+  assertEntitySetAllowed(args.entity_set);
+  const estimatedRecords = Math.max(0, Number(args.estimated_records || 0));
+  const batchSize = Math.min(Math.max(1, Number(args.batch_size || 50)), 500);
+  const approvalRequired = args.approval_required !== false || estimatedRecords > 100 || ['delete', 'merge'].includes(String(args.operation || '').toLowerCase());
+  return {
+    operationId: randomUUID(),
+    operation: args.operation,
+    entitySet: args.entity_set,
+    filter: args.filter || '',
+    proposedChanges: args.proposed_changes || {},
+    estimatedRecords,
+    batchSize,
+    estimatedBatches: estimatedRecords ? Math.ceil(estimatedRecords / batchSize) : 'unknown_until_preview',
+    approvalRequired,
+    phases: [
+      'Preview target records with dataverse_simulate_bulk_update or dataverse_query_all.',
+      'Calculate trust score and change impact.',
+      'Collect approval and evidence package.',
+      'Execute in batches with per-batch verification.',
+      'Record audit evidence and exceptions.',
+      'Run post-change validation and rollback plan if needed.',
+    ],
+    safeguards: [
+      'No mutation is performed by this planner.',
+      'Keep DATAVERSE_ALLOW_WRITES=false until approval is complete.',
+      'Use conservative batch sizes for production.',
+      'Stop on first unexpected validation error.',
+      'Preserve before-state evidence for rollback planning.',
+    ],
+    auditEvidence: complianceEvidenceSchema(),
+  };
+}
+
+async function getSecurityContextPayload() {
+  const whoami = await dataverseRequest('WhoAmI()');
+  const context = { whoami, user: null, roles: null, teams: null, warnings: [] };
+  if (whoami.UserId) {
+    const userId = cleanGuid(whoami.UserId);
+    try {
+      context.user = await dataverseRequest(
+        appendQuery(`systemusers(${userId})`, {
+          '$select': 'systemuserid,fullname,domainname,internalemailaddress,_businessunitid_value,isdisabled',
+        }),
+      );
+    } catch (error) {
+      context.warnings.push(`Could not read system user details: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    try {
+      context.roles = await dataverseRequest(
+        appendQuery(`systemusers(${userId})/systemuserroles_association`, {
+          '$select': 'roleid,name,businessunitid',
+          '$top': '100',
+        }),
+      );
+    } catch (error) {
+      context.warnings.push(`Could not read role associations: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    try {
+      context.teams = await dataverseRequest(
+        appendQuery(`systemusers(${userId})/teammembership_association`, {
+          '$select': 'teamid,name,_businessunitid_value',
+          '$top': '100',
+        }),
+      );
+    } catch (error) {
+      context.warnings.push(`Could not read team associations: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  return context;
 }
 
 async function callTool(name, args = {}) {
@@ -1094,41 +1300,19 @@ async function callTool(name, args = {}) {
     }
 
     case 'dataverse_get_security_context': {
-      const whoami = await dataverseRequest('WhoAmI()');
-      const context = { whoami, user: null, roles: null, teams: null, warnings: [] };
-      if (whoami.UserId) {
-        const userId = cleanGuid(whoami.UserId);
-        try {
-          context.user = await dataverseRequest(
-            appendQuery(`systemusers(${userId})`, {
-              '$select': 'systemuserid,fullname,domainname,internalemailaddress,_businessunitid_value,isdisabled',
-            }),
-          );
-        } catch (error) {
-          context.warnings.push(`Could not read system user details: ${error instanceof Error ? error.message : String(error)}`);
-        }
-        try {
-          context.roles = await dataverseRequest(
-            appendQuery(`systemusers(${userId})/systemuserroles_association`, {
-              '$select': 'roleid,name,businessunitid',
-              '$top': '100',
-            }),
-          );
-        } catch (error) {
-          context.warnings.push(`Could not read role associations: ${error instanceof Error ? error.message : String(error)}`);
-        }
-        try {
-          context.teams = await dataverseRequest(
-            appendQuery(`systemusers(${userId})/teammembership_association`, {
-              '$select': 'teamid,name,_businessunitid_value',
-              '$top': '100',
-            }),
-          );
-        } catch (error) {
-          context.warnings.push(`Could not read team associations: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      }
-      return jsonText(context);
+      return jsonText(await getSecurityContextPayload());
+    }
+
+    case 'dataverse_evaluate_action_permission': {
+      return jsonText(await evaluateActionPermission(args));
+    }
+
+    case 'dataverse_plan_bulk_operation': {
+      return jsonText(planBulkOperation(args));
+    }
+
+    case 'dataverse_result_schemas': {
+      return jsonText(resultSchemas());
     }
 
     default:

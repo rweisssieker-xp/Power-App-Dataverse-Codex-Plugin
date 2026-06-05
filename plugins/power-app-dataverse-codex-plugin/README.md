@@ -118,6 +118,9 @@ The monetizable USP pack extends this with:
 | `dataverse_environment_variable_report` | Report environment variable definitions and values |
 | `dataverse_check_solution_dependencies` | Produce a solution dependency review brief |
 | `dataverse_get_security_context` | Inspect current identity, roles, and teams where readable |
+| `dataverse_evaluate_action_permission` | Evaluate a planned action against roles, approvals, and policy context |
+| `dataverse_plan_bulk_operation` | Produce a governed bulk-operation plan without mutating Dataverse |
+| `dataverse_result_schemas` | Return stable result schemas for key governance outputs |
 | `dataverse_create_record` | Create a record, gated by write enablement and confirmation |
 | `dataverse_update_record` | Update a record, gated by write enablement and confirmation |
 | `dataverse_delete_record` | Delete a record, gated by write enablement and confirmation |

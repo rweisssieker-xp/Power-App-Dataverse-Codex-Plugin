@@ -17,6 +17,8 @@ The plugin positions Dataverse as an autonomous enterprise intelligence platform
 - [Production Readiness](PRODUCTION.md)
 - [Security Model](SECURITY.md)
 - [Marketing Positioning](MARKETING.md)
+- [Tenant Setup](TENANT_SETUP.md)
+- [Release Notes](RELEASE_NOTES.md)
 - [Environment Template](.env.example)
 
 ## Repository Layout

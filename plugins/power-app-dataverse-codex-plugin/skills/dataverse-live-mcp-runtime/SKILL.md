@@ -55,6 +55,9 @@ The MCP server reads these environment variables:
 - Change impact: `dataverse_analyze_change_impact`
 - ALM and solution review: `dataverse_list_solutions`, `dataverse_describe_solution`, `dataverse_environment_variable_report`, `dataverse_check_solution_dependencies`
 - Security context: `dataverse_get_security_context`
+- Permission evaluation: `dataverse_evaluate_action_permission`
+- Bulk planning: `dataverse_plan_bulk_operation`
+- Stable schemas: `dataverse_result_schemas`
 
 ## Output Expectations
 When using live tools, report:
