@@ -1,6 +1,6 @@
 {
   "name": "power-app-dataverse-codex-plugin",
-  "version": "0.1.0+codex.20260528125343",
+  "version": "0.1.0+codex.20260605042224",
   "description": "Enterprise guidance skills for designing conversational Dataverse and Power Apps action workflows.",
   "author": {
     "name": "Local developer"

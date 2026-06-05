@@ -12,8 +12,13 @@ const config = {
   clientSecret: process.env.AZURE_CLIENT_SECRET || '',
   accessToken: process.env.DATAVERSE_ACCESS_TOKEN || '',
   oauthScope: process.env.DATAVERSE_OAUTH_SCOPE || '',
+  authMode: process.env.DATAVERSE_AUTH_MODE || 'auto',
   allowWrites: String(process.env.DATAVERSE_ALLOW_WRITES || '').toLowerCase() === 'true',
   maxTop: parsePositiveInt(process.env.DATAVERSE_MAX_TOP, 500),
+  retryAttempts: parsePositiveInt(process.env.DATAVERSE_RETRY_ATTEMPTS, 3),
+  retryBaseMs: parsePositiveInt(process.env.DATAVERSE_RETRY_BASE_MS, 500),
+  requestTimeoutMs: parsePositiveInt(process.env.DATAVERSE_REQUEST_TIMEOUT_MS, 30000),
+  auditLogPath: process.env.DATAVERSE_AUDIT_LOG || '',
 };
 
 let tokenCache = null;
@@ -73,6 +78,24 @@ const tools = [
         orderby: { type: 'string', description: 'OData $orderby expression.' },
         expand: { type: 'string', description: 'OData $expand expression.' },
         top: { type: 'number', description: 'Maximum records to return.' },
+      },
+      required: ['entity_set'],
+    },
+  },
+  {
+    name: 'dataverse_query_all',
+    description: 'Run a paginated Dataverse OData query and follow @odata.nextLink up to safety limits.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        entity_set: { type: 'string', description: 'Entity set name, for example accounts.' },
+        select: { type: 'array', items: { type: 'string' }, description: 'Columns for $select.' },
+        filter: { type: 'string', description: 'OData $filter expression.' },
+        orderby: { type: 'string', description: 'OData $orderby expression.' },
+        expand: { type: 'string', description: 'OData $expand expression.' },
+        top: { type: 'number', description: 'Page size for each Dataverse request.' },
+        max_pages: { type: 'number', description: 'Maximum pages to fetch. Default 3.' },
+        max_records: { type: 'number', description: 'Maximum records to return. Default 500.' },
       },
       required: ['entity_set'],
     },
@@ -175,6 +198,11 @@ const tools = [
       required: ['entity_set', 'proposed_changes'],
     },
   },
+  {
+    name: 'dataverse_audit_status',
+    description: 'Show local MCP audit-log configuration and whether audit logging is enabled.',
+    inputSchema: { type: 'object', properties: {} },
+  },
 ];
 
 function normalizeDataverseUrl(value) {
@@ -208,9 +236,11 @@ function requireConfig() {
   if (!config.dataverseUrl) {
     throw new Error('Missing DATAVERSE_URL, for example https://org.crm4.dynamics.com');
   }
-  if (!config.accessToken && (!config.tenantId || !config.clientId || !config.clientSecret)) {
+  const canUseClientCredentials = config.tenantId && config.clientId && config.clientSecret;
+  const canUseDeviceCode = config.tenantId && config.clientId;
+  if (!config.accessToken && !canUseClientCredentials && !canUseDeviceCode) {
     throw new Error(
-      'Missing OAuth configuration. Set DATAVERSE_ACCESS_TOKEN or AZURE_TENANT_ID, AZURE_CLIENT_ID, and AZURE_CLIENT_SECRET.',
+      'Missing OAuth configuration. Set DATAVERSE_ACCESS_TOKEN, client credentials, or AZURE_TENANT_ID and AZURE_CLIENT_ID for device-code auth.',
     );
   }
 }
@@ -264,6 +294,14 @@ function selectValue(select) {
   return select.join(',');
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function shouldUseDeviceCode() {
+  return config.authMode === 'device_code' || (!config.clientSecret && !config.accessToken);
+}
+
 async function getAccessToken() {
   requireConfig();
   if (config.accessToken) return config.accessToken;
@@ -271,6 +309,10 @@ async function getAccessToken() {
   const now = Math.floor(Date.now() / 1000);
   if (tokenCache && tokenCache.expiresAt - 60 > now) {
     return tokenCache.accessToken;
+  }
+
+  if (shouldUseDeviceCode()) {
+    return getDeviceCodeToken(now);
   }
 
   const scope = config.oauthScope || `${config.dataverseUrl}/.default`;
@@ -299,7 +341,62 @@ async function getAccessToken() {
   return tokenCache.accessToken;
 }
 
+async function getDeviceCodeToken(now) {
+  const scope = config.oauthScope || `${config.dataverseUrl}/user_impersonation offline_access`;
+  const deviceCodeUrl = `https://login.microsoftonline.com/${encodeURIComponent(config.tenantId)}/oauth2/v2.0/devicecode`;
+  const tokenUrl = `https://login.microsoftonline.com/${encodeURIComponent(config.tenantId)}/oauth2/v2.0/token`;
+  const deviceBody = new URLSearchParams({
+    client_id: config.clientId,
+    scope,
+  });
+
+  const deviceResponse = await fetch(deviceCodeUrl, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: deviceBody,
+  });
+  const devicePayload = await deviceResponse.json().catch(() => ({}));
+  if (!deviceResponse.ok || !devicePayload.device_code) {
+    throw new Error(`Device-code request failed (${deviceResponse.status}): ${JSON.stringify(devicePayload)}`);
+  }
+
+  console.error(devicePayload.message || `Open ${devicePayload.verification_uri} and enter code ${devicePayload.user_code}.`);
+
+  const intervalSeconds = Number(devicePayload.interval || 5);
+  const expiresAt = now + Number(devicePayload.expires_in || 900);
+  while (Math.floor(Date.now() / 1000) < expiresAt) {
+    await sleep(intervalSeconds * 1000);
+    const tokenBody = new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+      client_id: config.clientId,
+      device_code: devicePayload.device_code,
+    });
+    const tokenResponse = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: tokenBody,
+    });
+    const tokenPayload = await tokenResponse.json().catch(() => ({}));
+    if (tokenResponse.ok && tokenPayload.access_token) {
+      tokenCache = {
+        accessToken: tokenPayload.access_token,
+        expiresAt: Math.floor(Date.now() / 1000) + Number(tokenPayload.expires_in || 3600),
+      };
+      return tokenCache.accessToken;
+    }
+    if (!['authorization_pending', 'slow_down'].includes(tokenPayload.error)) {
+      throw new Error(`Device-code token request failed (${tokenResponse.status}): ${JSON.stringify(tokenPayload)}`);
+    }
+  }
+
+  throw new Error('Device-code authorization expired before sign-in completed.');
+}
+
 async function dataverseRequest(path, options = {}) {
+  return dataverseRequestUrl(`${config.dataverseUrl}/api/data/v9.2/${path.replace(/^\/+/, '')}`, options);
+}
+
+async function dataverseRequestUrl(url, options = {}) {
   const token = await getAccessToken();
   const method = options.method || 'GET';
   const headers = {
@@ -315,23 +412,88 @@ async function dataverseRequest(path, options = {}) {
     body = JSON.stringify(options.body);
   }
 
-  const response = await fetch(`${config.dataverseUrl}/api/data/v9.2/${path.replace(/^\/+/, '')}`, {
-    method,
-    headers,
-    body,
-  });
+  const startedAt = new Date().toISOString();
+  let lastError;
+  for (let attempt = 1; attempt <= config.retryAttempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), config.requestTimeoutMs);
+    try {
+      const response = await fetch(url, {
+        method,
+        headers,
+        body,
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
 
-  const text = await response.text();
-  const payload = text ? tryParseJson(text) : null;
-  if (!response.ok) {
-    throw new Error(`Dataverse request failed (${response.status} ${response.statusText}): ${text}`);
-  }
+      const text = await response.text();
+      const payload = text ? tryParseJson(text) : null;
+      await writeAuditEvent({
+        startedAt,
+        completedAt: new Date().toISOString(),
+        method,
+        url: redactUrl(url),
+        status: response.status,
+        ok: response.ok,
+        attempt,
+        mutating: method !== 'GET',
+      });
 
-  const entityId = response.headers.get('odata-entityid') || response.headers.get('OData-EntityId');
-  if (response.status === 204) {
-    return entityId ? { status: response.status, entityId } : { status: response.status };
+      if (!response.ok) {
+        const retryAfter = Number(response.headers.get('retry-after') || 0);
+        const retryable = response.status === 429 || response.status >= 500;
+        lastError = new Error(`Dataverse request failed (${response.status} ${response.statusText}): ${text}`);
+        if (retryable && attempt < config.retryAttempts) {
+          await sleep(retryAfter ? retryAfter * 1000 : config.retryBaseMs * attempt);
+          continue;
+        }
+        throw lastError;
+      }
+
+      const entityId = response.headers.get('odata-entityid') || response.headers.get('OData-EntityId');
+      if (response.status === 204) {
+        return entityId ? { status: response.status, entityId } : { status: response.status };
+      }
+      return payload ?? { status: response.status, entityId };
+    } catch (error) {
+      clearTimeout(timeout);
+      lastError = error;
+      const retryable = error?.name === 'AbortError';
+      await writeAuditEvent({
+        startedAt,
+        completedAt: new Date().toISOString(),
+        method,
+        url: redactUrl(url),
+        ok: false,
+        attempt,
+        mutating: method !== 'GET',
+        error: error instanceof Error ? error.message : String(error),
+      });
+      if (retryable && attempt < config.retryAttempts) {
+        await sleep(config.retryBaseMs * attempt);
+        continue;
+      }
+      throw error;
+    }
   }
-  return payload ?? { status: response.status, entityId };
+  throw lastError;
+}
+
+function redactUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}${parsed.search ? '?...' : ''}`;
+  } catch {
+    return url;
+  }
+}
+
+async function writeAuditEvent(event) {
+  if (!config.auditLogPath) return;
+  const { appendFile, mkdir } = await import('node:fs/promises');
+  const { dirname } = await import('node:path');
+  await mkdir(dirname(config.auditLogPath), { recursive: true });
+  await appendFile(config.auditLogPath, `${JSON.stringify(event)}\n`, 'utf8');
 }
 
 function tryParseJson(text) {
@@ -351,9 +513,14 @@ async function callTool(name, args = {}) {
         clientIdConfigured: Boolean(config.clientId),
         clientSecretConfigured: Boolean(config.clientSecret),
         accessTokenConfigured: Boolean(config.accessToken),
+        authMode: config.authMode,
+        deviceCodeAvailable: Boolean(config.tenantId && config.clientId),
         oauthScope: config.oauthScope || (config.dataverseUrl ? `${config.dataverseUrl}/.default` : ''),
         writesEnabled: config.allowWrites,
         maxTop: config.maxTop,
+        retryAttempts: config.retryAttempts,
+        requestTimeoutMs: config.requestTimeoutMs,
+        auditLogEnabled: Boolean(config.auditLogPath),
       };
       if (args.request_token === true) {
         const token = await getAccessToken();
@@ -396,6 +563,39 @@ async function callTool(name, args = {}) {
         '$top': String(topValue(args.top)),
       };
       return jsonText(await dataverseRequest(appendQuery(args.entity_set, params)));
+    }
+
+    case 'dataverse_query_all': {
+      assertIdentifier(args.entity_set, 'entity_set');
+      const params = {
+        '$select': selectValue(args.select),
+        '$filter': args.filter,
+        '$orderby': args.orderby,
+        '$expand': args.expand,
+        '$top': String(topValue(args.top)),
+      };
+      const maxPages = Math.min(parsePositiveInt(args.max_pages, 3), 25);
+      const maxRecords = Math.min(parsePositiveInt(args.max_records, 500), config.maxTop * maxPages);
+      const records = [];
+      let nextUrl = `${config.dataverseUrl}/api/data/v9.2/${appendQuery(args.entity_set, params)}`;
+      let pagesFetched = 0;
+      while (nextUrl && pagesFetched < maxPages && records.length < maxRecords) {
+        const page = await dataverseRequestUrl(nextUrl);
+        pagesFetched += 1;
+        const values = Array.isArray(page?.value) ? page.value : [];
+        for (const record of values) {
+          if (records.length >= maxRecords) break;
+          records.push(record);
+        }
+        nextUrl = typeof page?.['@odata.nextLink'] === 'string' ? page['@odata.nextLink'] : '';
+      }
+      return jsonText({
+        records,
+        count: records.length,
+        pagesFetched,
+        hasMore: Boolean(nextUrl),
+        nextLinkOmitted: Boolean(nextUrl),
+      });
     }
 
     case 'dataverse_retrieve_record': {
@@ -469,6 +669,13 @@ async function callTool(name, args = {}) {
         nextStep: 'Review selected records and proposedChanges. To mutate data, use dataverse_update_record with DATAVERSE_ALLOW_WRITES=true and confirm=true per record or implement a governed bulk action.',
       });
     }
+
+    case 'dataverse_audit_status':
+      return jsonText({
+        auditLogEnabled: Boolean(config.auditLogPath),
+        auditLogPathConfigured: Boolean(config.auditLogPath),
+        auditLogPath: config.auditLogPath ? '[configured]' : '',
+      });
 
     default:
       return errorText(`Unknown tool: ${name}`);

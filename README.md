@@ -84,11 +84,18 @@ Optional:
 
 ```text
 DATAVERSE_OAUTH_SCOPE=https://your-org.crm4.dynamics.com/.default
+DATAVERSE_AUTH_MODE=auto
 DATAVERSE_ACCESS_TOKEN=<direct-bearer-token-instead-of-client-credentials>
 DATAVERSE_MAX_TOP=500
+DATAVERSE_RETRY_ATTEMPTS=3
+DATAVERSE_RETRY_BASE_MS=500
+DATAVERSE_REQUEST_TIMEOUT_MS=30000
+DATAVERSE_AUDIT_LOG=
 ```
 
 Writes are blocked unless `DATAVERSE_ALLOW_WRITES=true` and the tool call includes `confirm=true`.
+
+`DATAVERSE_AUTH_MODE=device_code` enables delegated device-code OAuth when `AZURE_TENANT_ID` and `AZURE_CLIENT_ID` are configured. The MCP server prints the Microsoft sign-in instruction to stderr.
 
 ## Validation
 
@@ -109,6 +116,14 @@ Run the MCP smoke test manually by starting the plugin in Codex after setting th
 1. `dataverse_oauth_status`
 2. `dataverse_whoami`
 3. `dataverse_list_tables`
+
+## Runtime Hardening
+
+- Retry/backoff for Dataverse throttling and transient server errors.
+- Request timeout through `DATAVERSE_REQUEST_TIMEOUT_MS`.
+- Paginated reads through `dataverse_query_all`.
+- Optional local JSONL audit log through `DATAVERSE_AUDIT_LOG`.
+- Device-code OAuth for delegated login scenarios.
 
 ## Local PRD PDF
 

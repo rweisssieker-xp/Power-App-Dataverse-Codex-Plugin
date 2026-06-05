@@ -1,6 +1,6 @@
 {
   "name": "power-app-dataverse-codex-plugin",
-  "version": "0.1.0+codex.20260528125343",
+  "version": "0.1.0+codex.20260605042223",
   "description": "Enterprise guidance skills and OAuth MCP tools for Dataverse and Power Platform AI action workflows.",
   "author": {
     "name": "Local developer"

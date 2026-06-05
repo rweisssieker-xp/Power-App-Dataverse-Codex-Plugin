@@ -53,9 +53,14 @@ Optional:
 
 ```text
 DATAVERSE_OAUTH_SCOPE
+DATAVERSE_AUTH_MODE
 DATAVERSE_ACCESS_TOKEN
 DATAVERSE_ALLOW_WRITES
 DATAVERSE_MAX_TOP
+DATAVERSE_RETRY_ATTEMPTS
+DATAVERSE_RETRY_BASE_MS
+DATAVERSE_REQUEST_TIMEOUT_MS
+DATAVERSE_AUDIT_LOG
 ```
 
 ## Production Safety Defaults
@@ -65,6 +70,10 @@ DATAVERSE_MAX_TOP
 - Bulk mutation is not exposed as a one-call tool.
 - `dataverse_simulate_bulk_update` provides preview-only behavior.
 - OData `top` is capped by `DATAVERSE_MAX_TOP`.
+- Reads can use `dataverse_query_all` for bounded pagination.
+- Transient 429/5xx responses are retried with backoff.
+- Requests are bounded by `DATAVERSE_REQUEST_TIMEOUT_MS`.
+- Optional JSONL audit events can be written to `DATAVERSE_AUDIT_LOG`.
 - Tool output never prints OAuth secrets.
 
 ## Release Checklist
@@ -91,6 +100,7 @@ First live checks:
 3. Call `dataverse_list_tables`.
 4. Call `dataverse_describe_table` for a known table such as `account`.
 5. Call `dataverse_query` with a small `top` value.
+6. Call `dataverse_query_all` with conservative `max_pages` and `max_records` values when pagination is required.
 
 Write enablement:
 
@@ -103,6 +113,7 @@ Write enablement:
 ## Known Limits
 
 - OAuth uses client credentials or a supplied bearer token; interactive delegated OAuth is not implemented.
+- Delegated device-code OAuth is available through `DATAVERSE_AUTH_MODE=device_code`, but production deployments should still prefer tenant-approved service principals or managed identity patterns where supported.
 - The MCP server does not implement managed bulk execution.
 - Cross-system connectors are strategic roadmap capabilities unless integrated separately.
 - Advanced USP documents describe product direction and must not be represented as fully implemented runtime behavior.

@@ -24,8 +24,13 @@ Optional:
 
 ```text
 DATAVERSE_OAUTH_SCOPE=https://your-org.crm4.dynamics.com/.default
+DATAVERSE_AUTH_MODE=auto
 DATAVERSE_ACCESS_TOKEN=<direct-bearer-token-instead-of-client-credentials>
 DATAVERSE_MAX_TOP=500
+DATAVERSE_RETRY_ATTEMPTS=3
+DATAVERSE_RETRY_BASE_MS=500
+DATAVERSE_REQUEST_TIMEOUT_MS=30000
+DATAVERSE_AUDIT_LOG=
 ```
 
 The Entra app registration must be allowed to access Dataverse in the target environment. The recommended first live checks are:
@@ -35,6 +40,8 @@ The Entra app registration must be allowed to access Dataverse in the target env
 3. `dataverse_list_tables`
 
 Keep `DATAVERSE_ALLOW_WRITES=false` until the target environment, permissions, and operation risk have been reviewed.
+
+Use `DATAVERSE_AUTH_MODE=device_code` for delegated device-code OAuth when client credentials are not the right fit. Use `DATAVERSE_AUDIT_LOG` to write local JSONL audit events outside source control.
 
 ## PRD Coverage
 
@@ -100,6 +107,7 @@ The monetizable USP pack extends this with:
 | `dataverse_list_tables` | List table metadata from `EntityDefinitions` |
 | `dataverse_describe_table` | Inspect table metadata and attributes |
 | `dataverse_query` | Run OData reads against an entity set |
+| `dataverse_query_all` | Run bounded paginated OData reads |
 | `dataverse_retrieve_record` | Retrieve one record by GUID |
 | `dataverse_simulate_bulk_update` | Preview bulk-update scope without mutating records |
 | `dataverse_create_record` | Create a record, gated by write enablement and confirmation |
@@ -107,3 +115,4 @@ The monetizable USP pack extends this with:
 | `dataverse_delete_record` | Delete a record, gated by write enablement and confirmation |
 | `dataverse_execute_unbound_action` | Execute unbound Dataverse actions/functions |
 | `dataverse_execute_bound_action` | Execute bound Dataverse actions on a record |
+| `dataverse_audit_status` | Show local audit-log configuration |

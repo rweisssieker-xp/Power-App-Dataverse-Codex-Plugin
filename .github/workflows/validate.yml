@@ -1,0 +1,43 @@
+name: Validate
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install validation dependencies
+        run: python -m pip install pyyaml
+
+      - name: Validate root plugin
+        run: python .github/scripts/validate_plugin.py .
+
+      - name: Validate nested plugin
+        run: python .github/scripts/validate_plugin.py plugins/power-app-dataverse-codex-plugin
+
+      - name: Check MCP syntax
+        run: |
+          node --check mcp/dataverse-mcp.mjs
+          node --check plugins/power-app-dataverse-codex-plugin/mcp/dataverse-mcp.mjs
+
+      - name: Secret placeholder scan
+        shell: pwsh
+        run: |
+          $matches = Select-String -Path (Get-ChildItem -Recurse -File | Where-Object { $_.Name -ne 'dataverseplugin.pdf' }).FullName -Pattern 'AZURE_CLIENT_SECRET=.+\S|DATAVERSE_ACCESS_TOKEN=.+[A-Za-z0-9]{20}|client_secret=|password=|secret=.+[A-Za-z0-9]{20}' -ErrorAction SilentlyContinue
+          if ($matches) {
+            $matches | ForEach-Object { Write-Error "$($_.Path):$($_.LineNumber): potential secret pattern" }
+            exit 1
+          }
